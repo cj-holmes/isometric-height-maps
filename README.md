@@ -83,43 +83,25 @@ iso_project <-
   }
 ```
 
--   Now define the x, y, z coordinates of the 6 sides of the unit cube
-    in 3D space
+-   Now define the x, y, z coordinates of the 3 sides of the unit cube
+    that we will be able to see
 
 ``` r
-full_unit_cube_df <-
+unit_cube_df <-
   tribble(
-    ~g,   ~ux, ~uy, ~uz,
-    "a",  0,  0,  0,
-    "a",  0,  1,  0,
-    "a",  1,  1,  0,
-    "a",  1,  0,  0,
-
-    "b",  0,  0,  -1,
-    "b",  0,  1,  -1,
-    "b",  1,  1,  -1,
-    "b",  1,  0,  -1,
-
-    "c",  0,  0,  0,
-    "c",  0,  0,  -1,
-    "c",  0,  1,  -1,
-    "c",  0,  1,  0,
-
-    "d",  1,  0,  0,
-    "d",  1,  0,  -1,
-    "d",  1,  1,  -1,
-    "d",  1,  1,  0,
-
-    "e",  0,  0,  0,
-    "e",  1,  0,  0,
-    "e",  1,  0,  -1,
-    "e",  0,  0,  -1,
-
-    "f",  0,  1,  0,
-    "f",  1,  1,  0,
-    "f",  1,  1,  -1,
-    "f",  0,  1,  -1
-  )
+    ~face,   ~ux, ~uy, ~uz,
+    "right", 0,   0,   0,
+    "right", 0,   1,   0,
+    "right", 1,   1,   0,
+    "right", 1,   0,   0,
+    "left",  0,   0,   0,
+    "left",  0,   0,   1,
+    "left",  0,   1,   1,
+    "left",  0,   1,   0,
+    "top",   0,   1,   0,
+    "top",   1,   1,   0,
+    "top",   1,   1,   1,
+    "top",   0,   1,   1)
 ```
 
 -   Use `iso_project` to transform the coordinates of the unit cube and
@@ -128,35 +110,6 @@ full_unit_cube_df <-
 ``` r
 # Transform the unit cube x y z coordinates
 uc <- 
-  full_unit_cube_df %>% 
-  mutate(iso_project(ux, uy, uz) %>% 
-           t() %>% 
-           as_tibble(.name_repair = ~c("x", "y", "z")))
-
-# Visualise the cube faces
-ggplot()+
-  geom_polygon(data = uc, aes(x, y, group = g, fill = g))+
-  geom_polygon(data = uc %>% rename(g2=g), aes(x, y, group = g2), col = 1, fill=NA)+
-  coord_equal()+
-  facet_wrap(~g, nrow=1)+
-  theme(legend.position = "")
-```
-
-![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
-
--   I can see here that I only need faces b, c and f for these rotation
-    angles, as the other faces will be plotted behind these and so
-    theres no need to do the extra processing!
-
-``` r
-# Redefine the unit cube with only three faces and rename them for ease
-unit_cube_df <- 
-  full_unit_cube_df %>% 
-  filter(g %in% c("b", "c", "f")) %>% 
-  mutate(g = c(f = "top", c = "left", b="right")[g])
-
-# Re-run the projection using the new unit cube and visualise the output
-uc <- 
   unit_cube_df %>% 
   mutate(iso_project(ux, uy, uz) %>% 
            t() %>% 
@@ -164,12 +117,14 @@ uc <-
 
 # Visualise the cube faces
 ggplot()+
-  geom_polygon(data = uc, aes(x, y, group = g, fill = g))+
-  geom_polygon(data = uc %>% rename(g2=g), aes(x, y, group = g2), col = 1, fill=NA)+
-  coord_equal()
+  geom_polygon(data = uc, aes(x, y, group = face, fill = face))+
+  geom_polygon(data = uc %>% rename(face2=face), aes(x, y, group = face2), col = 1, fill=NA)+
+  coord_equal()+
+  facet_wrap(~face, nrow=1)+
+  theme(legend.position = "")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ## Volcano
 
@@ -219,8 +174,8 @@ f <- 0.25
 
 ``` r
 expand.grid(
-  z = nrow(volcano):1,
-  x = 1:ncol(volcano)) %>% 
+  z = (nrow(volcano)-1):0,
+  x = 0:(ncol(volcano)-1)) %>% 
   mutate(y = v, 
          col = cols, 
          block_id = row_number()) %>% 
@@ -230,11 +185,11 @@ expand.grid(
          uz = uz+z,
          iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
          col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
-         v2 = case_when(g == "top" ~ v,
-                        g == "right" ~ v*(1-f),
-                        g == "left" ~ v*(1-(2*f))),
+         v2 = case_when(face == "top" ~ v,
+                        face == "right" ~ v*(1-f),
+                        face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(g, block_id)) %>%
+         my_group = paste0(face, block_id)) %>%
   arrange(desc(x), desc(z)) %>% 
   mutate(my_group = fct_inorder(my_group)) %>% 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
@@ -242,7 +197,7 @@ expand.grid(
   coord_equal()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ``` r
 ggsave("volcano.pdf", width=30, height=17)
@@ -265,22 +220,22 @@ cols[which(v == max(v))] <- "red"
 cols[between(v, 5, 6)] <- "orange"
 
 expand.grid(
-  z = nrow(volcano):1,
-  x = 1:ncol(volcano)) %>% 
+  z = (nrow(volcano)-1):0,
+  x = 0:(ncol(volcano)-1)) %>% 
   mutate(y = v, 
          col = cols, 
          block_id = row_number()) %>% 
-  merge(unit_cube_df, all = TRUE) %>% 
+  merge(unit_cube_df, all = TRUE) %>%
   mutate(ux = ux+x, 
          uy = uy*y, 
          uz = uz+z,
          iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
          col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
-         v2 = case_when(g == "top" ~ v,
-                        g == "right" ~ v*(1-f),
-                        g == "left" ~ v*(1-(2*f))),
+         v2 = case_when(face == "top" ~ v,
+                        face == "right" ~ v*(1-f),
+                        face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(g, block_id)) %>%
+         my_group = paste0(face, block_id)) %>%
   arrange(desc(x), desc(z)) %>% 
   mutate(my_group = fct_inorder(my_group)) %>% 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
@@ -288,7 +243,7 @@ expand.grid(
   coord_equal()
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
 ggsave("volcano-highlights.pdf", width=30, height=17)
@@ -322,7 +277,9 @@ img_df <-
   image_blur() %>%
   image_raster() %>%
   rename(z = y) %>% 
-  mutate(col2rgb(col) %>% t() %>% as_tibble(),
+  mutate(x = x-1,
+         z = z-1,
+         col2rgb(col) %>% t() %>% as_tibble(),
          col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
          y = scales::rescale(v, c(0,20)),
          block_id = row_number()) %>% 
@@ -333,11 +290,11 @@ out <-
   img_df %>% 
   mutate(iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
          col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
-         v2 = case_when(g == "top" ~ v,
-                        g == "right" ~ v*(1-f),
-                        g == "left" ~ v*(1-(2*f))),
+         v2 = case_when(face == "top" ~ v,
+                        face == "right" ~ v*(1-f),
+                        face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(g, block_id)) %>%
+         my_group = paste0(face, block_id)) %>%
   arrange(desc(x), desc(z)) %>% 
   mutate(my_group = fct_inorder(my_group)) %>% 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
@@ -350,7 +307,7 @@ patchwork::wrap_plots(
 )
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ``` r
 ggsave("sweets.pdf", width=30, height=15)
@@ -382,7 +339,9 @@ img_df <-
   image_blur(sigma = 1) %>%
   image_raster() %>%
   rename(z = y) %>% 
-  mutate(col2rgb(col) %>% t() %>% as_tibble(),
+  mutate(x = x-1,
+         z = z-1,
+         col2rgb(col) %>% t() %>% as_tibble(),
          col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
          y = scales::rescale(v, c(0, 5)),
          block_id = row_number()) %>% 
@@ -393,11 +352,11 @@ out <-
   img_df %>% 
   mutate(iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
          col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
-         v2 = case_when(g == "top" ~ v,
-                        g == "right" ~ v*(1-f),
-                        g == "left" ~ v*(1-(2*f))),
+         v2 = case_when(face == "top" ~ v,
+                        face == "right" ~ v*(1-f),
+                        face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(g, block_id)) %>%
+         my_group = paste0(face, block_id)) %>%
   arrange(desc(x), desc(z)) %>% 
   mutate(my_group = fct_inorder(my_group)) %>% 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
@@ -410,98 +369,12 @@ patchwork::wrap_plots(
 )
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ``` r
 ggsave("water.pdf", width=30, height=15)
 ```
 
-## Another isometric angle
+# Thoughts
 
--   Now try a rotation around the vertical axis of -45 degrees (rather
-    than 45 degrees above).
--   Use `iso_project` to transform the coordinates of the unit cube and
-    then visualise each cube face in the projected space
-
-``` r
-# Transform the unit cube x y z coordinates using va = -45
-uc <- 
-  full_unit_cube_df %>% 
-  mutate(iso_project(ux, uy, uz, va = -45) %>%  # set va here
-           t() %>% 
-           as_tibble(.name_repair = ~c("x", "y", "z")))
-
-# Visualise the cube faces
-ggplot()+
-  geom_polygon(data = uc, aes(x, y, group = g, fill = g))+
-  geom_polygon(data = uc %>% rename(g2=g), aes(x, y, group = g2), col = 1, fill=NA)+
-  coord_equal()+
-  facet_wrap(~g, nrow=1)+
-  theme(legend.position = "")
-```
-
-![](README_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
-
--   Now I see that I need faces b, d and f
-
-``` r
-# Redefine the unit cube with only three faces and rename them for ease
-unit_cube_df <- 
-  full_unit_cube_df %>% 
-  filter(g %in% c("b", "d", "f")) %>% 
-  mutate(g = c(f = "top", b = "left", d="right")[g])
-
-# Re-run the projection using the new unit cube and visualise the output
-uc <- 
-  unit_cube_df %>% 
-  mutate(iso_project(ux, uy, uz, -45) %>% 
-           t() %>% 
-           as_tibble(.name_repair = ~c("x", "y", "z")))
-
-# Visualise the cube faces
-ggplot()+
-  geom_polygon(data = uc, aes(x, y, group = g, fill = g))+
-  geom_polygon(data = uc %>% rename(g2=g), aes(x, y, group = g2), col = 1, fill=NA)+
-  coord_equal()
-```
-
-![](README_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
-
--   Run on the image
-
-``` r
-expand.grid(
-  z = nrow(volcano):1,
-  x = 1:ncol(volcano)) %>% 
-  mutate(y = v, 
-         col = cols, 
-         block_id = row_number()) %>% 
-  merge(unit_cube_df, all = TRUE) %>% 
-  mutate(ux = ux+x, 
-         uy = uy*y, 
-         uz = uz+z,
-         iso_project(ux, uy, uz, -45) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
-         v2 = case_when(g == "top" ~ v,
-                        g == "right" ~ v*(1-f),
-                        g == "left" ~ v*(1-(2*f))),
-         col2 = hsv(h, s, v2),
-         my_group = paste0(g, block_id)) %>%
-  arrange(x, desc(z)) %>% 
-  mutate(my_group = fct_inorder(my_group)) %>% 
-  ggplot(aes(px, py, fill=I(col2), group=my_group))+
-  geom_polygon(col=NA)+
-  coord_equal()
-```
-
-![](README_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
-
-``` r
-ggsave("volcano_-45.pdf", width=30, height=17)
-```
-
-### Thoughts
-
--   This probably wont work well with negative height values
-    -   I think an additional ordering of the dataframe in y before
-        plotting will be required but that needs some investigation
+-   This wont work well with negative height values
