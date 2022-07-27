@@ -60,26 +60,26 @@ iso_project <-
     # Convert rotation angles to radians
     var <- va*(pi/180)
     har <- ha*(pi/180)
-    
+
     # Construct rotation matrices
-    m1a <- 
-      matrix(c(1, 0, 0,
-               0, cos(har), sin(har),
-               0, -sin(har), cos(har)),
-             byrow = TRUE,
-             ncol = 3)
-    
-    m1b <- 
-      matrix(c(cos(var), 0, -sin(var),
-               0, 1, 0,
-               sin(var), 0, cos(var)),
-             byrow = TRUE,
-             ncol = 3)
-    
+    m1a <- matrix(c(1, 0, 0, 0, cos(har), sin(har), 0, -sin(har), cos(har)),
+                  byrow = TRUE,
+                  ncol = 3)
+
+    m1b <- matrix(c(cos(var), 0, -sin(var), 0, 1, 0, sin(var), 0, cos(var)),
+                  byrow = TRUE,
+                  ncol = 3)
+
     m2 <- matrix(c(1,0,0,0,1,0,0,0,0), byrow = TRUE, nrow=3, ncol=3)
-    
-    # Perform vectorised matrix multiplication
-    Vectorize(function(x, y, z) m2 %*% ((m1a %*% m1b) %*% matrix(c(x, y, z))))(x, y, z)
+
+    m3 <- m2 %*% (m1a %*% m1b)
+
+    # Matrix multiplication
+    # m3 %*% matrix(c(x, y, z), nrow = 3, byrow = T)
+
+    # Slightly faster? Also means I dont need to transpose the output later on
+    crossprod(x = matrix(c(x, y, z), nrow = 3, byrow = T),
+              y = t(m3))
   }
 ```
 
@@ -110,15 +110,13 @@ unit_cube_df <-
 ``` r
 # Transform the unit cube x y z coordinates
 uc <- 
-  unit_cube_df %>% 
-  mutate(iso_project(ux, uy, uz) %>% 
-           t() %>% 
-           as_tibble(.name_repair = ~c("x", "y", "z")))
+  unit_cube_df |> 
+  mutate(iso_project(ux, uy, uz) |> as_tibble(.name_repair = ~c("x", "y", "z")))
 
 # Visualise the cube faces
 ggplot()+
   geom_polygon(data = uc, aes(x, y, group = face, fill = face))+
-  geom_polygon(data = uc %>% rename(face2=face), aes(x, y, group = face2), col = 1, fill=NA)+
+  geom_polygon(data = uc |> rename(face2=face), aes(x, y, group = face2), col = 1, fill=NA)+
   coord_equal()+
   facet_wrap(~face, nrow=1)+
   theme(legend.position = "")
@@ -149,7 +147,7 @@ v <- as.vector(volcano - min(volcano))/10
 
 ``` r
 cols <- 
-  colorRamp(viridis::turbo(n_distinct(v)))(scales::rescale(v, c(0,1))) %>% 
+  colorRamp(viridis::turbo(n_distinct(v)))(scales::rescale(v, c(0,1))) |> 
   apply(1, function(x) rgb(x[1], x[2], x[3], maxColorValue = 255))
 
 # Define factor for how much to lighten/darken the sides of the cuboids
@@ -175,23 +173,23 @@ f <- 0.25
 ``` r
 expand.grid(
   z = (nrow(volcano)-1):0,
-  x = 0:(ncol(volcano)-1)) %>% 
+  x = 0:(ncol(volcano)-1)) |> 
   mutate(y = v, 
          col = cols, 
-         block_id = row_number()) %>% 
-  merge(unit_cube_df, all = TRUE) %>%
+         block_id = row_number()) |> 
+  merge(unit_cube_df, all = TRUE) |>
   mutate(ux = ux+x, 
          uy = uy*y, 
          uz = uz+z,
-         iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
+         iso_project(ux, uy, uz) |> as_tibble(.name_repair = ~c("px", "py", "pz")),
+         col2rgb(col) |> rgb2hsv() |> t() |> as_tibble(),
          v2 = case_when(face == "top" ~ v,
                         face == "right" ~ v*(1-f),
                         face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(face, block_id)) %>%
-  arrange(desc(x), desc(z)) %>% 
-  mutate(my_group = fct_inorder(my_group)) %>% 
+         my_group = paste0(face, block_id)) |>
+  arrange(desc(x), desc(z)) |> 
+  mutate(my_group = fct_inorder(my_group)) |> 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
   geom_polygon(col=NA)+
   coord_equal()
@@ -200,6 +198,7 @@ expand.grid(
 ![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ``` r
+
 ggsave("volcano.pdf", width=30, height=17)
 ```
 
@@ -210,7 +209,7 @@ ggsave("volcano.pdf", width=30, height=17)
 
 ``` r
 cols <- 
-  colorRamp(viridis::mako(n_distinct(v)))(scales::rescale(v, c(0,1))) %>% 
+  colorRamp(viridis::mako(n_distinct(v)))(scales::rescale(v, c(0,1))) |> 
   apply(1, function(x) rgb(x[1], x[2], x[3], maxColorValue = 255))
 
 # Highlight highest part in red
@@ -221,23 +220,23 @@ cols[between(v, 5, 6)] <- "orange"
 
 expand.grid(
   z = (nrow(volcano)-1):0,
-  x = 0:(ncol(volcano)-1)) %>% 
+  x = 0:(ncol(volcano)-1)) |> 
   mutate(y = v, 
          col = cols, 
-         block_id = row_number()) %>% 
-  merge(unit_cube_df, all = TRUE) %>%
+         block_id = row_number()) |> 
+  merge(unit_cube_df, all = TRUE) |>
   mutate(ux = ux+x, 
          uy = uy*y, 
          uz = uz+z,
-         iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
+         iso_project(ux, uy, uz) |> as_tibble(.name_repair = ~c("px", "py", "pz")),
+         col2rgb(col) |> rgb2hsv() |> t() |> as_tibble(),
          v2 = case_when(face == "top" ~ v,
                         face == "right" ~ v*(1-f),
                         face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(face, block_id)) %>%
-  arrange(desc(x), desc(z)) %>% 
-  mutate(my_group = fct_inorder(my_group)) %>% 
+         my_group = paste0(face, block_id)) |>
+  arrange(desc(x), desc(z)) |> 
+  mutate(my_group = fct_inorder(my_group)) |> 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
   geom_polygon(col=NA)+
   coord_equal()
@@ -246,6 +245,7 @@ expand.grid(
 ![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
+
 ggsave("volcano-highlights.pdf", width=30, height=17)
 ```
 
@@ -270,39 +270,39 @@ s <- 200
 f <- 0.2
 
 img_df <- 
-  image_read('https://cdn.wallpapersafari.com/89/79/wW6LRs.jpg') %>% 
-  image_scale(geometry = paste0(s,"x",s,"^")) %>%
-  image_crop(geometry = paste0(s,"x",s), gravity = "center") %>%
-  image_flip() %>% 
-  image_blur() %>%
-  image_raster() %>%
-  rename(z = y) %>% 
+  image_read('https://cdn.wallpapersafari.com/89/79/wW6LRs.jpg') |> 
+  image_scale(geometry = paste0(s,"x",s,"^")) |>
+  image_crop(geometry = paste0(s,"x",s), gravity = "center") |>
+  image_flip() |> 
+  image_blur() |>
+  image_raster() |>
+  rename(z = y) |> 
   mutate(x = x-1,
          z = z-1,
-         col2rgb(col) %>% t() %>% as_tibble(),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
+         col2rgb(col) |> t() |> as_tibble(),
+         col2rgb(col) |> rgb2hsv() |> t() |> as_tibble(),
          y = scales::rescale(v, c(0,20)),
-         block_id = row_number()) %>% 
-  merge(unit_cube_df, all = TRUE) %>% 
+         block_id = row_number()) |> 
+  merge(unit_cube_df, all = TRUE) |> 
   mutate(ux = ux+x, uy = uy*y, uz = uz+z)
          
 out <-
-  img_df %>% 
-  mutate(iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
+  img_df |> 
+  mutate(iso_project(ux, uy, uz) |> as_tibble(.name_repair = ~c("px", "py", "pz")),
+         col2rgb(col) |> rgb2hsv() |> t() |> as_tibble(),
          v2 = case_when(face == "top" ~ v,
                         face == "right" ~ v*(1-f),
                         face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(face, block_id)) %>%
-  arrange(desc(x), desc(z)) %>% 
-  mutate(my_group = fct_inorder(my_group)) %>% 
+         my_group = paste0(face, block_id)) |>
+  arrange(desc(x), desc(z)) |> 
+  mutate(my_group = fct_inorder(my_group)) |> 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
   geom_polygon(col=NA)+
   coord_equal()
 
 patchwork::wrap_plots(
-  img_df %>% ggplot() + geom_raster(aes(x, z, fill = I(col))) + coord_equal(),
+  img_df |> ggplot() + geom_raster(aes(x, z, fill = I(col))) + coord_equal(),
   out
 )
 ```
@@ -310,6 +310,7 @@ patchwork::wrap_plots(
 ![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ``` r
+
 ggsave("sweets.pdf", width=30, height=15)
 ```
 
@@ -332,39 +333,39 @@ s <- 200
 f <- 0.2
 
 img_df <- 
-  image_read('https://kaboompics.com/cache/8/6/f/5/f/86f5fef3f896cf25c35fac3a3effd557e87fd4c9.jpeg') %>% 
-  image_scale(geometry = paste0(s,"x",s,"^")) %>%
-  image_crop(geometry = paste0(s,"x",s), gravity = "center") %>%
-  image_flip() %>% 
-  image_blur(sigma = 1) %>%
-  image_raster() %>%
-  rename(z = y) %>% 
+  image_read('https://kaboompics.com/cache/8/6/f/5/f/86f5fef3f896cf25c35fac3a3effd557e87fd4c9.jpeg') |> 
+  image_scale(geometry = paste0(s,"x",s,"^")) |>
+  image_crop(geometry = paste0(s,"x",s), gravity = "center") |>
+  image_flip() |> 
+  image_blur(sigma = 1) |>
+  image_raster() |>
+  rename(z = y) |> 
   mutate(x = x-1,
          z = z-1,
-         col2rgb(col) %>% t() %>% as_tibble(),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
+         col2rgb(col) |> t() |> as_tibble(),
+         col2rgb(col) |> rgb2hsv() |> t() |> as_tibble(),
          y = scales::rescale(v, c(0, 5)),
-         block_id = row_number()) %>% 
-  merge(unit_cube_df, all = TRUE) %>% 
+         block_id = row_number()) |> 
+  merge(unit_cube_df, all = TRUE) |> 
   mutate(ux = ux+x, uy = uy*y, uz = uz+z)
          
 out <-
-  img_df %>% 
-  mutate(iso_project(ux, uy, uz) %>% t() %>% as_tibble(.name_repair = ~c("px", "py", "pz")),
-         col2rgb(col) %>% rgb2hsv() %>% t() %>% as_tibble(),
+  img_df |> 
+  mutate(iso_project(ux, uy, uz) |> as_tibble(.name_repair = ~c("px", "py", "pz")),
+         col2rgb(col) |> rgb2hsv() |> t() |> as_tibble(),
          v2 = case_when(face == "top" ~ v,
                         face == "right" ~ v*(1-f),
                         face == "left" ~ v*(1-(2*f))),
          col2 = hsv(h, s, v2),
-         my_group = paste0(face, block_id)) %>%
-  arrange(desc(x), desc(z)) %>% 
-  mutate(my_group = fct_inorder(my_group)) %>% 
+         my_group = paste0(face, block_id)) |>
+  arrange(desc(x), desc(z)) |> 
+  mutate(my_group = fct_inorder(my_group)) |> 
   ggplot(aes(px, py, fill=I(col2), group=my_group))+
   geom_polygon(col=NA)+
   coord_equal()
 
 patchwork::wrap_plots(
-  img_df %>% ggplot() + geom_raster(aes(x, z, fill = I(col))) + coord_equal(),
+  img_df |> ggplot() + geom_raster(aes(x, z, fill = I(col))) + coord_equal(),
   out
 )
 ```
@@ -372,6 +373,7 @@ patchwork::wrap_plots(
 ![](README_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ``` r
+
 ggsave("water.pdf", width=30, height=15)
 ```
 
